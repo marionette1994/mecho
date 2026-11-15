@@ -60,6 +60,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.0.${{ github.run_number }}" mecho.apk \
-            --title "芽帖 v1.0.${{ github.run_number }}" \
+          gh release create "v1.1.${{ github.run_number }}" mecho.apk \
+            --title "芽帖 v1.1.${{ github.run_number }}" \
             --notes "Android用APK。mecho.apk をダウンロードしてインストールしてください。"

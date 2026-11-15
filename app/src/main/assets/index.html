@@ -45,6 +45,9 @@ nav button.on{color:var(--shu)}
 .habit{display:flex;align-items:center;gap:12px}
 .habit .cue{font-size:12px;color:var(--usu)}
 .habit .nm{font-size:19px;font-weight:700;word-break:break-word;line-height:1.35}
+.habit .memo{margin-top:6px;font-size:14px;min-height:38px;padding:6px 8px}
+.bl{font-size:13px;margin-top:8px;border-top:1px dashed var(--sen);padding-top:6px}
+.bl span{color:var(--usu);margin-right:6px}
 .habit.done{background:#f7f3e8}
 .habit.done .nm{color:var(--usu)}
 .habit .do{min-width:92px;min-height:56px;font-size:17px}
@@ -80,7 +83,7 @@ nav button.on{color:var(--shu)}
 <input type="file" id="file" accept=".json,application/json" hidden>
 <script>
 'use strict';
-const KEY='mecho.v1',VER='1.0';
+const KEY='mecho.v1',VER='1.1';
 const N=window.Native||null; // APK版のネイティブ連携（ブラウザではnull）
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -96,8 +99,8 @@ const jdate=s=>{const d=toDate(s);return (d.getMonth()+1)+'月'+d.getDate()+'日
 const DEF_SET={dayStart:3};
 function load(){
  try{const d=JSON.parse(localStorage.getItem(KEY));
-  if(d&&Array.isArray(d.habits))return {habits:d.habits,log:d.log||{},settings:Object.assign({},DEF_SET,d.settings),sync:d.sync||{}}}catch(e){}
- return {habits:[],log:{},settings:Object.assign({},DEF_SET),sync:{}};
+  if(d&&Array.isArray(d.habits))return {habits:d.habits,log:d.log||{},memo:d.memo||{},settings:Object.assign({},DEF_SET,d.settings),sync:d.sync||{}}}catch(e){}
+ return {habits:[],log:{},memo:{},settings:Object.assign({},DEF_SET),sync:{}};
 }
 let S=load();
 let syncTimer=null;
@@ -115,6 +118,12 @@ const val=(date,id)=>(S.log[date]&&S.log[date][id])||0;
 function setVal(date,id,v){
  if(v){(S.log[date]=S.log[date]||{})[id]=v}
  else if(S.log[date]){delete S.log[date][id];if(!Object.keys(S.log[date]).length)delete S.log[date]}
+}
+// おまけの中身（実際にやった量）
+const memo=(date,id)=>(S.memo[date]&&S.memo[date][id])||'';
+function setMemo(date,id,t){
+ if(t){(S.memo[date]=S.memo[date]||{})[id]=t}
+ else if(S.memo[date]){delete S.memo[date][id];if(!Object.keys(S.memo[date]).length)delete S.memo[date]}
 }
 function stats(h){
  const t=today(),start=h.created||t;
@@ -135,7 +144,7 @@ let view='today',cur=null; // cur: 表示中の日付（nullなら今日）
 function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2400)}
 
 /* ---------- 書き出し ---------- */
-const backupAll=()=>JSON.stringify({app:'mecho',version:1,saved:new Date().toISOString(),habits:S.habits,log:S.log,settings:S.settings},null,2);
+const backupAll=()=>JSON.stringify({app:'mecho',version:1,saved:new Date().toISOString(),habits:S.habits,log:S.log,memo:S.memo,settings:S.settings},null,2);
 function toMd(){
  const t=today(),out=['# 芽帖　小さな習慣の記録',''];
  const keys=Object.keys(S.log);if(!keys.includes(t))keys.push(t);
@@ -143,7 +152,7 @@ function toMd(){
   const hs=S.habits.filter(h=>val(k,h.id)||(!h.archived&&(h.created||k)<=k));
   if(!hs.length)return;
   out.push('## '+k);
-  hs.forEach(h=>{const v=val(k,h.id);out.push('- ['+(v?'x':' ')+'] '+h.name+(v===2?'（おまけ）':''))});
+  hs.forEach(h=>{const v=val(k,h.id);const m=memo(k,h.id);out.push('- ['+(v?'x':' ')+'] '+h.name+(v===2?'（おまけ'+(m?'：'+m:'')+'）':''))});
   out.push('');
  });
  return out.join('\n');
@@ -154,6 +163,7 @@ function importText(text){
   if(!d||!Array.isArray(d.habits))return toast('芽帖のバックアップではありません');
   S.habits=d.habits.filter(h=>h&&h.id&&h.name);
   S.log=(d.log&&typeof d.log==='object')?d.log:{};
+  S.memo=(d.memo&&typeof d.memo==='object')?d.memo:{};
   S.settings=Object.assign({},DEF_SET,d.settings);
   save();view='today';cur=null;render();toast('読み込みました（習慣'+S.habits.length+'件）');
  }catch(e){toast('JSONを読み込めませんでした')}
@@ -232,7 +242,7 @@ function vToday(){
   const v=val(d,x.id);
   h+=`<div class="card habit ${v?'done':''}"><div class="grow">
    ${x.cue?`<div class="cue">${esc(x.cue)}</div>`:''}<div class="nm">${esc(x.name)}</div>
-   ${v===2?'<div class="cue">おまけまで出来た</div>':''}</div><div class="side">
+   ${v===2?`<input class="memo" data-m="${x.id}" value="${esc(memo(d,x.id))}" placeholder="おまけ：実際にやった量（例：15回）" maxlength="40">`:''}</div><div class="side">
    ${v?`<button class="stamp ${v===2?'plus':''}" data-act="undo" data-id="${x.id}">${v===2?'済＋':'済'}</button>
     ${v===1?`<button class="sm ghost" data-act="bonus" data-id="${x.id}">おまけ＋</button>`:''}`
     :`<button class="shu do" data-act="done" data-id="${x.id}">できた</button>`}</div></div>`;
@@ -252,10 +262,12 @@ function vRec(){
   const s=stats(x);let cells='';
   for(let i=0;i<84;i++){const k=addDays(first,i),v=val(k,x.id);
    cells+=`<i class="${k>t?'x':v===2?'b':v?'a':''}${k===t?' t':''}"></i>`}
+  const bl=Object.keys(S.memo).filter(k=>memo(k,x.id)&&val(k,x.id)===2).sort().reverse().slice(0,5)
+   .map(k=>`<span>${toDate(k).getMonth()+1}/${toDate(k).getDate()}</span>${esc(memo(k,x.id))}`).join('<br>');
   h+=`<div class="card"><div class="nm" style="font-weight:700">${esc(x.name)}</div>
    <div class="stats"><div><b>${s.cur}</b>連続日数</div><div><b>${s.best}</b>最長</div><div><b>${s.rate}%</b>30日達成率</div><div><b>${s.bonus}</b>おまけ</div></div>
    <div class="heat">${cells}</div>
-   <div class="legend"><span>直近12週</span><span><i style="background:#e6a99f"></i>達成</span><span><i style="background:var(--shu)"></i>おまけ</span><span>通算 ${s.total}日</span></div></div>`;
+   <div class="legend"><span>直近12週</span><span><i style="background:#e6a99f"></i>達成</span><span><i style="background:var(--shu)"></i>おまけ</span><span>通算 ${s.total}日</span></div>${bl?`<div class="bl"><b>最近のおまけ</b><br>${bl}</div>`:''}</div>`;
  });
  return h;
 }
@@ -338,8 +350,8 @@ function arm(el,label){ // 二度押しで確定
 const A={
  ex(el){const e=EX[+el.dataset.i];if(addHabit(e[0],e[1]))render()},
  done(el){setVal(cur||today(),el.dataset.id,1);save();render()},
- bonus(el){setVal(cur||today(),el.dataset.id,2);save();render()},
- undo(el){const d=cur||today(),v=val(d,el.dataset.id);setVal(d,el.dataset.id,v-1);save();render()},
+ bonus(el){setVal(cur||today(),el.dataset.id,2);save();render();const i=$('[data-m="'+el.dataset.id+'"]');if(i)i.focus()},
+ undo(el){const d=cur||today(),v=val(d,el.dataset.id);setVal(d,el.dataset.id,v-1);if(v===2)setMemo(d,el.dataset.id,'');save();render()},
  prev(){cur=addDays(cur||today(),-1);render()},
  next(){cur=addDays(cur||today(),1);render()},
  now(){cur=null;render()},
@@ -349,7 +361,7 @@ const A={
  arc(el){byId(el.dataset.id).archived=true;save();render()},
  unarc(el){delete byId(el.dataset.id).archived;save();render()},
  del(el){if(!arm(el,'本当に削除'))return;const id=el.dataset.id;
-  S.habits=S.habits.filter(h=>h.id!==id);Object.keys(S.log).forEach(k=>setVal(k,id,0));save();render()},
+  S.habits=S.habits.filter(h=>h.id!==id);Object.keys(S.log).forEach(k=>setVal(k,id,0));Object.keys(S.memo).forEach(k=>setMemo(k,id,''));save();render()},
  exp(){dl('mecho-backup-'+today()+'.json',backupAll(),'application/json')},
  expMd(){dl('mecho-log-'+today()+'.md',toMd(),'text/markdown')},
  imp(el){if(S.habits.length&&!arm(el,'今のデータを置き換える（もう一度押す）'))return;
@@ -368,6 +380,7 @@ document.addEventListener('change',e=>{
  const el=e.target;
  if(el.id==='dayStart'){S.settings.dayStart=+el.value;save();return}
  if(el.id==='file'&&el.files[0]){const r=new FileReader();r.onload=()=>importText(r.result);r.readAsText(el.files[0]);return}
+ if(el.dataset.m){setMemo(cur||today(),el.dataset.m,el.value.trim());save();return}
  if(el.dataset.f){const h=byId(el.dataset.id);if(!h)return;const v=el.value.trim();
   if(el.dataset.f==='name'&&!v){el.value=h.name;return toast('目標は空にできません')}
   h[el.dataset.f]=v;save()}
