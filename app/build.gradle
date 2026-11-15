@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+def ksFile = rootProject.file('signing/release.jks')
+def ksPass = System.getenv('KEYSTORE_PASS') ?: 'mecho-key'
+
+android {
+    namespace 'jp.marionette1994.mecho'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'jp.marionette1994.mecho'
+        minSdk 26
+        targetSdk 34
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int)
+        versionName '1.0.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+    }
+
+    signingConfigs {
+        release {
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword ksPass
+                keyAlias 'mecho'
+                keyPassword ksPass
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ksFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
